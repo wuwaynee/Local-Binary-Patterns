@@ -1,0 +1,189 @@
+parameter DATA_WIDTH = 8;
+parameter ADDR_WIDTH = 19;
+parameter DATA_LENGTH = 224000;
+module	memory_for_processing(
+	input 			clk,
+	input			rst,
+	input 			[DATA_WIDTH-1:0]	data_in,
+	input           cmd,
+	input 			[ADDR_WIDTH-1:0]	r_addr,
+	input           write_enable,
+	output 	       	[DATA_WIDTH-1:0]	data_out,
+	output   reg    output_ready
+);
+
+
+reg 	[ADDR_WIDTH-1:0]	w_addr;
+reg		[DATA_WIDTH-1:0]	img_store	[DATA_LENGTH-1:0];
+
+
+reg data_ready;
+always@(posedge clk or posedge rst)begin
+	if(!rst)begin
+	   w_addr <= 0;
+	   data_ready <= 0;
+	end
+	else begin
+	   if(write_enable & !data_ready)begin
+	       if(w_addr == DATA_LENGTH-1)begin
+	           data_ready<=1;
+	       end
+	       else begin
+	           img_store[w_addr]	<=	data_in;
+	           w_addr <= w_addr + 1;
+	       end
+	   end
+	   else begin
+	   
+	   end
+	end
+		
+end
+
+
+//The main image processing module
+reg [ADDR_WIDTH-1:0]	p_addr;
+always@(cmd)begin
+    output_ready=0;
+    p_addr=0;
+end
+always@(posedge clk or negedge rst)begin
+    if(!rst)begin
+        p_addr <= 0;
+        output_ready <= 0;
+    end
+    else begin
+        if(data_ready & !output_ready)begin
+            if(p_addr== DATA_LENGTH-1)begin
+                output_ready<=1;
+            end
+            else begin
+                case(cmd)
+                    0   :   begin
+                                 img_store[p_addr] <= img_store[p_addr] << 1;
+                            end
+                    1   :   begin
+                                img_store[p_addr] <= img_store[p_addr] >> 1;
+                            end
+                 endcase
+                 p_addr <= p_addr + 1;
+            end
+        end
+        else begin
+        
+        end
+	end
+end
+
+// Output data
+assign data_out	=	img_store[r_addr];
+endmodule
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+parameter DATA_WIDTH = 8;
+parameter ADDR_WIDTH = 19;
+parameter DATA_LENGTH = 224000;
+parameter read_in_data =0;
+parameter image_processing = 1;
+
+module	memory_for_processing(
+	input 			clk,
+	input			rst,
+	
+	input 			[ADDR_WIDTH-1:0]	addr_from_VGA,
+	input  		[ADDR_WIDTH-1:0] 	addr_to_bram,
+	input 			[DATA_WIDTH-1:0]	data_in,
+	output 	       	[DATA_WIDTH-1:0]	data_out,
+	input           cmd,
+	input           write_enable,
+	output   reg    output_ready
+);
+
+reg [2:0] state;
+reg [2:0] Nextstate;
+reg		[DATA_WIDTH-1:0]	img_store	[DATA_LENGTH-1:0];
+reg 	[ADDR_WIDTH-1:0]	p_addr;
+integer index;
+
+// Output data
+assign data_out	= img_store[addr_from_VGA];
+
+/*
+always@(posedge clk)begin
+    addr_to_bram <= addr_to_bram + 1;
+    if(write_enable)
+        img_store[addr_to_bram]	<=	data_in;
+end
+*/
+always@(cmd)begin
+    Nextstate <= 0;
+end
+
+
+
+
+always@(posedge clk or negedge rst)begin
+	if(!rst)begin
+		output_ready <= 0;
+		//addr_to_bram <= 0;
+		p_addr <= 0;
+		state <= read_in_data;
+	end
+	else begin
+		state <= Nextstate;
+	    case(state)
+	        read_in_data		:   begin
+										if(write_enable)begin
+											if(addr_to_bram == DATA_LENGTH-1)begin
+												state <= image_processing;
+												//addr_to_bram <= 0;
+												output_ready <= 0;
+												p_addr <= 0;
+											end
+											else begin
+												img_store[addr_to_bram]	<=	data_in;
+												//addr_to_bram <= addr_to_bram + 1;
+											end
+										end
+									end
+	       	image_processing	:   begin
+										if(!output_ready)begin
+											if( p_addr == DATA_LENGTH-1)begin
+												output_ready<=1;
+											end
+											else begin
+												case(cmd)
+													0   :   begin
+																img_store[p_addr] <= img_store[p_addr] << 1;
+															end
+													1   :   begin
+																img_store[p_addr] <= img_store[p_addr] >> 1;
+															end
+												endcase
+												p_addr <= p_addr + 1;
+											end
+										end
+	                            	end
+	   	endcase
+	end
+end
+
+endmodule
+
+
+
+
+
+
